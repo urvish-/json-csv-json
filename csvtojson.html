@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV to JSON Converter</title>
+    <style>
+        /* CSS STYLES */
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --bg-light: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: var(--bg-light);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #444;
+            margin-bottom: 25px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px dashed var(--border-color);
+            border-radius: 6px;
+            text-align: center;
+            background-color: #fafafa;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .file-label:hover {
+            background-color: #0056b3;
+        }
+
+        #fileNameDisplay {
+            margin-left: 10px;
+            font-style: italic;
+            color: #666;
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #convertBtn { background-color: var(--primary-color); color: white; flex-grow: 1;}
+        #convertBtn:hover { background-color: #0056b3; }
+        
+        #copyBtn { background-color: var(--secondary-color); color: white; }
+        #copyBtn:hover { background-color: #545b62; }
+
+        #downloadBtn { background-color: var(--success-color); color: white; }
+        #downloadBtn:hover { background-color: #1e7e34; }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #fcfcfc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box; /* Crucial for padding not affecting width */
+        }
+
+        .status-message {
+            text-align: center;
+            margin-top: 10px;
+            min-height: 25px;
+            font-weight: bold;
+        }
+        .success { color: var(--success-color); }
+        .error { color: #dc3545; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>CSV to JSON Converter</h1>
+
+    <div class="input-group">
+        <label for="csvFileInput" class="file-label">Choose CSV File</label>
+        <input type="file" id="csvFileInput" accept=".csv">
+        <span id="fileNameDisplay">No file chosen</span>
+    </div>
+
+    <div class="actions-bar">
+        <button id="convertBtn" disabled>Convert to JSON</button>
+        <button id="copyBtn" disabled>Copy JSON</button>
+        <button id="downloadBtn" disabled>Export JSON File</button>
+    </div>
+
+    <textarea id="jsonOutput" placeholder="JSON output will appear here..." readonly></textarea>
+    <div id="statusMessage" class="status-message"></div>
+</div>
+
+
+<script>
+    // Elements needed needed
+    const fileInput = document.getElementById('csvFileInput');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const convertBtn = document.getElementById('convertBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const jsonOutput = document.getElementById('jsonOutput');
+    const statusMessage = document.getElementById('statusMessage');
+
+    let selectedFile = null;
+
+    // Helper to show status messages
+    function showStatus(message, type = 'success') {
+        statusMessage.textContent = message;
+        statusMessage.className = 'status-message ' + type;
+        setTimeout(() => {
+            statusMessage.textContent = '';
+            statusMessage.className = 'status-message';
+        }, 3000);
+    }
+
+    // --- Event Listeners ---
+
+    // 1. File Selection listener
+    fileInput.addEventListener('change', (e) => {
+        selectedFile = e.target.files[0];
+        if (selectedFile) {
+            fileNameDisplay.textContent = selectedFile.name;
+            convertBtn.disabled = false;
+             // Reset output area when a new file is picked
+             jsonOutput.value = '';
+             copyBtn.disabled = true;
+             downloadBtn.disabled = true;
+        } else {
+            fileNameDisplay.textContent = "No file chosen";
+            convertBtn.disabled = true;
+        }
+    });
+
+    // 2. Convert Button Listener
+    convertBtn.addEventListener('click', () => {
+        if (!selectedFile) {
+            showStatus("Please select a file first.", "error");
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const csvText = e.target.result;
+            try {
+                const jsonResult = convertCsvTextToJson(csvText);
+                // Display pretty-printed JSON (2 space indentation)
+                jsonOutput.value = JSON.stringify(jsonResult, null, 2);
+                
+                // Enable subsequent actions
+                copyBtn.disabled = false;
+                downloadBtn.disabled = false;
+                showStatus("Conversion successful!");
+            } catch (error) {
+                 showStatus("Error parsing CSV: " + error.message, "error");
+                 jsonOutput.value = "";
+            }
+        };
+
+        reader.onerror = function() {
+            showStatus("Error reading file.", "error");
+        };
+
+        // Read the file as plain text
+        reader.readAsText(selectedFile);
+    });
+
+
+    // 3. Copy Button Listener
+    copyBtn.addEventListener('click', () => {
+        if (!jsonOutput.value) return;
+
+        // Select the text field visually
+        jsonOutput.select();
+        jsonOutput.setSelectionRange(0, 99999); // For mobile devices
+
+        // Use the modern Clipboard API
+        navigator.clipboard.writeText(jsonOutput.value)
+            .then(() => {
+                showStatus("JSON copied to clipboard!");
+            })
+            .catch(err => {
+                 showStatus("Failed to copy text.", "error");
+                 console.error('Error copying text: ', err);
+            });
+    });
+
+
+    // 4. Download Button Listener
+    downloadBtn.addEventListener('click', () => {
+        if (!jsonOutput.value) return;
+
+        // Create a blob object representing the data as a JSON file
+        const blob = new Blob([jsonOutput.value], { type: 'application/json' });
+        
+        // Create a temporary anchor element to trigger the download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        // Use original filename but change extension to .json
+        const newFileName = selectedFile.name.replace(/\.[^/.]+$/, "") + ".json";
+        a.download = newFileName || 'data.json';
+        
+        // Append anchor to body, click it, and remove it
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Release the object URL
+        URL.revokeObjectURL(url);
+        showStatus("Download started!");
+    });
+
+
+    // --- Core Logic: CSV Parsing ---
+
+    /**
+     * Converts raw CSV text into a JSON object array.
+     * Handles basic quoted fields (e.g., "Smith, John").
+     */
+    function convertCsvTextToJson(csvText) {
+        // 1. Parse CSV into a 2D array (handling quoted commas)
+        // This regex matches a quoted field OR a non-comma field.
+        const reValid = /^\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*(?:,\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*)*$/;
+        
+        // A simpler, generally effective regex for splitting CSV lines correctly
+        // It looks for quoted strings OR non-comma sequences.
+        const csvPattern = /(?:\"([^\"]*(?:\"\"[^\"]*)*)\")|([^,]+)/g;
+
+        let lines = csvText.split(/\r?\n/); // Split by new line
+        
+        // Remove empty trailing line if present
+        if(lines[lines.length-1] === "") {
+            lines.pop();
+        }
+
+        if (lines.length < 2) {
+            throw new Error("CSV file must have a header row and at least one data row.");
+        }
+
+        // Helper to split a single line correctly accounting for quotes
+        const splitLine = (line) => {
+             const result = [];
+             let matches = null;
+             // Reset lastIndex because we are reusing the regex with 'g' flag
+             csvPattern.lastIndex = 0; 
+             
+             while ((matches = csvPattern.exec(line))) {
+                 // matches[1] is the content inside quotes (if quoted)
+                 // matches[2] is the content if not quoted
+                 let value = matches[1] !== undefined ? matches[1] : matches[2];
+                 // Handle escaped double quotes ("") inside quoted fields
+                 value = value.replace(/""/g, '"');
+                 result.push(value);
+             }
+             return result;
+        };
+
+
+        // Extract headers (first line)
+        const headers = splitLine(lines[0]);
+
+        const result = [];
+
+        // Process data rows
+        for (let i = 1; i < lines.length; i++) {
+            const currentLineStr = lines[i];
+            if (!currentLineStr.trim()) continue; // skip empty lines
+
+            const currentLineValues = splitLine(currentLineStr);
+            
+            const obj = {};
+            // Map values to headers
+            for (let j = 0; j < headers.length; j++) {
+                // Use empty string if value doesn't exist for header
+                obj[headers[j]] = currentLineValues[j] !== undefined ? currentLineValues[j] : "";
+            }
+            result.push(obj);
+        }
+
+        return result;
+    }
+
+</script>
+</body>
+</html>
